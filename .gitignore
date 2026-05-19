@@ -1,0 +1,13 @@
+# Build outputs
+build/
+cmake-build-*/
+*.user
+
+# Qt Creator / IDE
+.qtc_clangd/
+.cache/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
