@@ -16,6 +16,25 @@
 - 使用 `windeployqt` 后程序能进入 Qt 事件循环
 - 新增 `scripts/run.ps1`，用于临时配置 Qt 运行环境并启动程序
 - 配置 VS Code C/C++ 扩展读取 `build\compile_commands.json`，用于识别 Qt 头文件和编译参数
+- 新增 `scripts/build.ps1`，用于通过 CMake 固定构建 Qt 项目，避免误用单文件 gcc 编译
+
+## 2026-05-20
+
+### 已完成
+
+- 解释 VS Code 不是编译器，真正编译 C++ 的是 MSVC、MinGW 或 Clang
+- 解释 Qt、VS Code、CMake、Ninja、MinGW 的分工
+- 解释 `main.cpp` 不能直接运行，必须先编译生成 `ChatTest.exe`
+- 处理 VS Code 中 `QApplication` include 报错：使用 `compile_commands.json` 给 IntelliSense 提供真实编译参数
+- 完成第一次 Git 提交：`Initialize Qt chat project`
+- 配置 GitHub 远程仓库：`https://github.com/xiaodu4346/chattest.git`
+- 合并 GitHub 上已有的远程初始提交，保留本地完整 README
+- 成功推送 `main` 分支到 GitHub
+- 先逐行讲解了第一个 `QLabel` 示例窗口
+- 理解了 `QApplication`、`QLabel`、`show()` 和 `app.exec()` 的基本作用
+- 把 `QLabel` 示例窗口改成登录窗口雏形
+- 初步学习 `QWidget`、`QLineEdit`、`QPushButton` 和 `QVBoxLayout`
+- 初步学习 Qt 信号槽：使用 `QObject::connect` 让登录按钮点击后更新窗口标题
 
 ### 当前阶段
 
@@ -23,7 +42,7 @@
 
 ### 下一次建议学习内容
 
-1. 运行第一个 Qt 窗口程序
-2. 理解 `QApplication`、`QLabel`、`show()` 和 `app.exec()`
-3. 把简单标签窗口改成登录窗口
-4. 理解 Qt 的控件、布局和信号槽
+1. 从“登录按钮已经能响应点击”继续
+2. 逐行讲解当前登录窗口代码
+3. 进一步理解 Qt 信号槽和 lambda 写法
+4. 让登录按钮同时检查用户名和密码
