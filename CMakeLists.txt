@@ -11,6 +11,8 @@ qt_standard_project_setup()
 
 qt_add_executable(ChatTest
     src/main.cpp
+    src/LoginWindow.h
+    src/LoginWindow.cpp
 )
 
 target_link_libraries(ChatTest

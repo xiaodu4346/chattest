@@ -37,6 +37,11 @@
 - 用户提问并理解了：同样写成 `&xxx`，普通表达式里的 `&loginButton` 是取地址，lambda 捕获列表里的 `[&window]` / `[&statusLabel]` 是按引用捕获
 - 用户提问并理解了：`passwordEdit.setEchoMode(QLineEdit::Password)` 是设置密码输入框隐藏明文，用户名输入框默认普通显示，所以不用设置
 - 用户尝试自己实现错误提示，先用 `QLineEdit` 和临时 `QLabel`，最后理解了控件生命周期：界面里长期显示的控件要提前创建并加入布局，点击事件里只更新 `setText()`
+- 已提交登录窗口雏形：`Build login window prototype`
+- 已讲解 CMake 的基本角色：CMake 读取固定命名的 `CMakeLists.txt`，生成 Ninja 能执行的构建规则；真正编译的是 MinGW g++
+- 已把登录窗口拆成 `LoginWindow` 类：`src\LoginWindow.h` 放声明，`src\LoginWindow.cpp` 放实现，`src\main.cpp` 现在只负责程序启动
+- 已更新 `CMakeLists.txt`，把 `src\LoginWindow.h` 和 `src\LoginWindow.cpp` 加入构建
+- 拆分后已重新构建成功。曾遇到 `ChatTest.exe: Permission denied`，原因是旧程序进程仍运行，关闭进程后构建成功
 
 ## 常用命令
 
@@ -73,10 +78,10 @@ https://github.com/xiaodu4346/chattest.git
 
 下一次新对话建议直接从这里开始：
 
-1. 从“登录按钮已经能响应点击”这个状态继续
-2. 逐行讲解当前登录窗口代码
-3. 继续学习 Qt 控件、布局、信号槽和 lambda
-4. 可以开始把 `main.cpp` 里的登录窗口逻辑拆成单独的类，为后续聊天窗口做准备
+1. 从拆分后的 `LoginWindow` 类继续
+2. 逐行讲解 `src\main.cpp`、`src\LoginWindow.h` 和 `src\LoginWindow.cpp`
+3. 继续学习 `.h` / `.cpp` 分工、成员变量、指针、`->`、`this`、Qt 父子对象自动释放
+4. 继续巩固 Qt 信号槽和类成员函数作为槽函数的写法
 
 注意：用户希望学习节奏是先讲解再改代码。目前登录窗口已经正式开始实现，但后续仍要保持细致讲解。
 

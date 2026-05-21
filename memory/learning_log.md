@@ -40,6 +40,11 @@
 - 理解 `&loginButton` 是取地址，而 lambda 捕获列表里的 `[&window]` / `[&statusLabel]` 是按引用捕获
 - 理解 `passwordEdit.setEchoMode(QLineEdit::Password)` 用于让密码输入框隐藏明文输入，用户名框不需要这一行
 - 理解控件生命周期：不要在点击事件的 `if` 代码块里临时创建错误提示 `QLabel`，应该提前创建长期存在的 `statusLabel`，事件发生时只调用 `setText()` 修改文字
+- 完成阶段性提交：`Build login window prototype`
+- 初步理解 CMake 不是编译器，而是读取 `CMakeLists.txt` 生成构建规则的工具
+- 把登录窗口从 `src/main.cpp` 拆分到 `src/LoginWindow.h` 和 `src/LoginWindow.cpp`
+- 更新 `CMakeLists.txt`，把 `LoginWindow.h` 和 `LoginWindow.cpp` 加入 `qt_add_executable`
+- 重新构建成功；第一次构建失败是因为旧的 `ChatTest.exe` 进程仍在运行，占用了输出文件
 
 ### 当前阶段
 
@@ -47,7 +52,7 @@
 
 ### 下一次建议学习内容
 
-1. 从当前登录窗口版本继续
-2. 逐行复习当前 `src\main.cpp`
-3. 进一步理解 Qt 信号槽、lambda 捕获和控件生命周期
-4. 考虑把界面代码从 `main.cpp` 拆到单独的登录窗口类
+1. 逐行讲解拆分后的 `src\main.cpp`、`src\LoginWindow.h` 和 `src\LoginWindow.cpp`
+2. 理解 `.h` 放声明、`.cpp` 放实现
+3. 理解成员变量、指针、`->`、`this` 和 Qt 父子对象自动释放
+4. 继续巩固信号槽：`connect(loginButton, &QPushButton::clicked, this, &LoginWindow::handleLogin)`
