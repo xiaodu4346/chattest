@@ -23,25 +23,33 @@ int main(int argc, char *argv[])
     passwordEdit.setPlaceholderText("Password");
     passwordEdit.setEchoMode(QLineEdit::Password);
 
+    QLabel statusLabel;
     QPushButton loginButton("Login");
 
     QVBoxLayout layout;
     layout.addWidget(&titleLabel);
     layout.addWidget(&usernameEdit);
     layout.addWidget(&passwordEdit);
+    layout.addWidget(&statusLabel);
     layout.addWidget(&loginButton);
-
+   
     window.setLayout(&layout);
 
-    QObject::connect(&loginButton, &QPushButton::clicked, [&window, &usernameEdit]() {
+    QObject::connect(&loginButton, &QPushButton::clicked, [&usernameEdit, &passwordEdit, &statusLabel]() {
         const QString username = usernameEdit.text();
-
+        const QString password = passwordEdit.text();
+      
         if (username.isEmpty()) {
-            window.setWindowTitle("Please enter a username");
+            statusLabel.setText("Please enter a username");
             return;
         }
 
-        window.setWindowTitle("Hello, " + username);
+        if (password.isEmpty()) {
+            statusLabel.setText("Please enter a password");
+            return;
+        }
+
+        statusLabel.setText("Login success. Hello, " + username);
     });
 
     window.show();

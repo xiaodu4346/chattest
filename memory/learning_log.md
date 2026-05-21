@@ -35,6 +35,11 @@
 - 把 `QLabel` 示例窗口改成登录窗口雏形
 - 初步学习 `QWidget`、`QLineEdit`、`QPushButton` 和 `QVBoxLayout`
 - 初步学习 Qt 信号槽：使用 `QObject::connect` 让登录按钮点击后更新窗口标题
+- 让登录按钮同时读取用户名和密码，并检查两个输入框是否为空
+- 把错误提示从窗口标题改为窗口内的 `QLabel statusLabel`
+- 理解 `&loginButton` 是取地址，而 lambda 捕获列表里的 `[&window]` / `[&statusLabel]` 是按引用捕获
+- 理解 `passwordEdit.setEchoMode(QLineEdit::Password)` 用于让密码输入框隐藏明文输入，用户名框不需要这一行
+- 理解控件生命周期：不要在点击事件的 `if` 代码块里临时创建错误提示 `QLabel`，应该提前创建长期存在的 `statusLabel`，事件发生时只调用 `setText()` 修改文字
 
 ### 当前阶段
 
@@ -42,7 +47,7 @@
 
 ### 下一次建议学习内容
 
-1. 从“登录按钮已经能响应点击”继续
-2. 逐行讲解当前登录窗口代码
-3. 进一步理解 Qt 信号槽和 lambda 写法
-4. 让登录按钮同时检查用户名和密码
+1. 从当前登录窗口版本继续
+2. 逐行复习当前 `src\main.cpp`
+3. 进一步理解 Qt 信号槽、lambda 捕获和控件生命周期
+4. 考虑把界面代码从 `main.cpp` 拆到单独的登录窗口类

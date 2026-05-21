@@ -32,8 +32,11 @@
 - 配置 `compile_commands.json`，解决 VS Code 对 `QApplication` 的 IntelliSense 报错
 - 已逐行讲解原始 `QLabel` 示例窗口
 - 用户已经理解第一个 `main.cpp` 的意思，包括 `QApplication`、`QLabel`、`show()` 和 `app.exec()`
-- 登录窗口目前包含标题、用户名输入框、密码输入框和登录按钮
-- 登录按钮已通过 `QObject::connect` 接上点击响应：用户名为空时修改窗口标题提示，否则显示 `Hello, 用户名`
+- 登录窗口目前包含标题、用户名输入框、密码输入框、状态提示标签和登录按钮
+- 登录按钮已通过 `QObject::connect` 接上点击响应：读取用户名和密码，检查是否为空，再修改窗口内的 `statusLabel` 提示
+- 用户提问并理解了：同样写成 `&xxx`，普通表达式里的 `&loginButton` 是取地址，lambda 捕获列表里的 `[&window]` / `[&statusLabel]` 是按引用捕获
+- 用户提问并理解了：`passwordEdit.setEchoMode(QLineEdit::Password)` 是设置密码输入框隐藏明文，用户名输入框默认普通显示，所以不用设置
+- 用户尝试自己实现错误提示，先用 `QLineEdit` 和临时 `QLabel`，最后理解了控件生命周期：界面里长期显示的控件要提前创建并加入布局，点击事件里只更新 `setText()`
 
 ## 常用命令
 
@@ -73,6 +76,7 @@ https://github.com/xiaodu4346/chattest.git
 1. 从“登录按钮已经能响应点击”这个状态继续
 2. 逐行讲解当前登录窗口代码
 3. 继续学习 Qt 控件、布局、信号槽和 lambda
+4. 可以开始把 `main.cpp` 里的登录窗口逻辑拆成单独的类，为后续聊天窗口做准备
 
 注意：用户希望学习节奏是先讲解再改代码。目前登录窗口已经正式开始实现，但后续仍要保持细致讲解。
 
