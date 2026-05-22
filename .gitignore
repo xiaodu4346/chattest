@@ -3,6 +3,9 @@ build/
 cmake-build-*/
 *.user
 
+# Local project memory
+memory/
+
 # Qt Creator / IDE
 .qtc_clangd/
 .cache/
