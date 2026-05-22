@@ -1,9 +1,12 @@
 #include "LoginWindow.h"
 
+#include "ChatWindow.h"
+
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QString>
+#include <Qt>
 #include <QVBoxLayout>
 
 LoginWindow::LoginWindow(QWidget *parent)
@@ -50,4 +53,10 @@ void LoginWindow::handleLogin()
     }
 
     statusLabel->setText("Login success. Hello, " + username);
+
+    ChatWindow *chatWindow = new ChatWindow(username);
+    chatWindow->setAttribute(Qt::WA_DeleteOnClose);
+    chatWindow->show();
+
+    close();
 }
