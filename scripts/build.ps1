@@ -13,3 +13,9 @@ Set-Location $projectRoot
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 & $cmake --build build
+
+$sqlDriverSource = "C:\Qt\6.11.1\mingw_64\plugins\sqldrivers\qsqlite.dll"
+$sqlDriverTargetDir = Join-Path $projectRoot "build\sqldrivers"
+
+New-Item -ItemType Directory -Force -Path $sqlDriverTargetDir | Out-Null
+Copy-Item -Force $sqlDriverSource $sqlDriverTargetDir

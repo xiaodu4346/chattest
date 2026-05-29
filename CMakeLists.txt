@@ -13,6 +13,8 @@ qt_add_executable(ChatTest
     src/main.cpp
     src/ChatWindow.h
     src/ChatWindow.cpp
+    src/DatabaseManager.h
+    src/DatabaseManager.cpp
     src/LoginWindow.h
     src/LoginWindow.cpp
 )
