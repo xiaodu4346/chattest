@@ -1,6 +1,7 @@
 #include "DatabaseManager.h"
 
 #include <QDebug>
+#include <QDateTime>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -26,13 +27,23 @@ bool DatabaseManager::createTables()
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             friend TEXT NOT NULL,
             sender TEXT NOT NULL,
-            content TEXT NOT NULL
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT ''
         )
     )";
 
     if (!query.exec(sql)) {
         qDebug() << "Failed to create messages table:" << query.lastError().text();
         return false;
+    }
+
+    QSqlQuery alterQuery;
+    if (!alterQuery.exec("ALTER TABLE messages ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")) {
+        const QString errorText = alterQuery.lastError().text();
+        if (!errorText.contains("duplicate column name")) {
+            qDebug() << "Failed to add created_at column:" << errorText;
+            return false;
+        }
     }
 
     return true;
@@ -42,12 +53,14 @@ bool DatabaseManager::saveMessage(const QString &friendName, const QString &send
 {
     QSqlQuery query;
     query.prepare(R"(
-        INSERT INTO messages (friend, sender, content)
-        VALUES (:friend, :sender, :content)
+        INSERT INTO messages (friend, sender, content, created_at)
+        VALUES (:friend, :sender, :content, :created_at)
     )");
     query.bindValue(":friend", friendName);
     query.bindValue(":sender", sender);
     query.bindValue(":content", content);
+    const QString createdAt = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+    query.bindValue(":created_at", createdAt);
 
     if (!query.exec()) {
         qDebug() << "Failed to save message:" << query.lastError().text();
@@ -61,7 +74,7 @@ QString DatabaseManager::loadMessages(const QString &friendName)
 {
     QSqlQuery query;
     query.prepare(R"(
-        SELECT sender, content
+        SELECT sender, content, created_at
         FROM messages
         WHERE friend = :friend
         ORDER BY id
@@ -78,7 +91,12 @@ QString DatabaseManager::loadMessages(const QString &friendName)
     while (query.next()) {
         const QString sender = query.value(0).toString();
         const QString content = query.value(1).toString();
-        history += sender + ": " + content + "\n";
+        const QString createdAt = query.value(2).toString();
+        if (createdAt.isEmpty()) {
+            history += sender + ": " + content + "\n";
+        } else {
+            history += "[" + createdAt + "] " + sender + ": " + content + "\n";
+        }
     }
 
     return history;
