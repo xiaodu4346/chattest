@@ -9,6 +9,7 @@ class QListWidget;
 class QLabel;
 class QPlainTextEdit;
 class QPushButton;
+class QTcpSocket;
 
 class ChatWindow : public QWidget
 {
@@ -23,6 +24,7 @@ private:
     QLabel *chatTargetLabel;
     QMap<QString, QString> chatHistory;
     QPushButton *sendButton;
+    QTcpSocket *socket;
 
     void handleSendMessage();
     void handleFriendChanged(const QString &friendName);

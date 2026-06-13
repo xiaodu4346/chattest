@@ -2,6 +2,8 @@
 
 #include "DatabaseManager.h"
 
+#include <QAbstractSocket>
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -9,10 +11,12 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QTcpSocket>
 
 ChatWindow::ChatWindow(const QString &username, QWidget *parent)
     : QWidget(parent),
-      username(username)
+      username(username),
+      socket(new QTcpSocket(this))
 {
     resize(640, 480);
     setWindowTitle("ChatTest");
@@ -54,6 +58,16 @@ ChatWindow::ChatWindow(const QString &username, QWidget *parent)
     connect(messageEdit, &QLineEdit::returnPressed, this, &ChatWindow::handleSendMessage);
     connect(friendList, &QListWidget::currentTextChanged, this, &ChatWindow::handleFriendChanged);
     friendList->setCurrentRow(0);
+
+    connect(socket, &QTcpSocket::connected, this, []() {
+        qDebug() << "connected to server";
+    });
+
+    connect(socket, &QTcpSocket::errorOccurred, this, [](QAbstractSocket::SocketError) {
+        qDebug() << "connect server error";
+    });
+
+    socket->connectToHost("127.0.0.1", 12345);
 }
 
 void ChatWindow::handleSendMessage()
