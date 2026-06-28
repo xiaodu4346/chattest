@@ -13,6 +13,12 @@ int main(int argc, char *argv[])
     QObject::connect(&server, &QTcpServer::newConnection, [&server](){
         QTcpSocket *clientSocket = server.nextPendingConnection();
         qDebug() << "New client connected:" << clientSocket;
+
+        QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket]() {
+            QByteArray data = clientSocket->readAll();
+            qDebug() << "Received data from client:" << data;
+
+        });
     });
 
     if (!server.listen(QHostAddress::Any,12345)) {

@@ -83,6 +83,9 @@ void ChatWindow::handleSendMessage()
     }
 
     appendMessage(username, message);
+    if (socket->state() == QTcpSocket::ConnectedState) {
+        socket->write(message.toUtf8());
+    }
     appendAutoReply(message);
     messageEdit->clear();
 }
