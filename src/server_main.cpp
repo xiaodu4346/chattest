@@ -1,6 +1,9 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QHostAddress>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
 #include <QTcpServer>
 #include <QTcpSocket>
 
@@ -16,8 +19,24 @@ int main(int argc, char *argv[])
 
         QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket]() {
             QByteArray data = clientSocket->readAll();
-            qDebug() << "Received data from client:" << data;
 
+            QJsonParseError error;
+            QJsonDocument document = QJsonDocument::fromJson(data, &error);
+
+            if (error.error != QJsonParseError::NoError || !document.isObject()) {
+                qDebug() << "Invalid JSON from client:" << QString::fromUtf8(data);
+                return;
+            }
+
+            QJsonObject json = document.object();
+
+            QString sender = json["sender"].toString();
+            QString receiver = json["receiver"].toString();
+            QString content = json["content"].toString();
+
+            qDebug() << "sender:" << sender;
+            qDebug() << "receiver:" << receiver;
+            qDebug() << "content:" << content;
         });
     });
 

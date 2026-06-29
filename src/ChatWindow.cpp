@@ -10,6 +10,8 @@
 #include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QVBoxLayout>
 #include <QTcpSocket>
 
@@ -84,7 +86,15 @@ void ChatWindow::handleSendMessage()
 
     appendMessage(username, message);
     if (socket->state() == QTcpSocket::ConnectedState) {
-        socket->write(message.toUtf8());
+        QJsonObject json;
+        json["sender"] = username;
+        json["receiver"] = friendList->currentItem()->text();
+        json["content"] = message;
+
+        QJsonDocument document(json);
+        QByteArray data = document.toJson(QJsonDocument::Compact);
+
+        socket->write(data);
     }
     appendAutoReply(message);
     messageEdit->clear();
