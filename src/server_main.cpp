@@ -20,32 +20,34 @@ int main(int argc, char *argv[])
 
         QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket,buffer]() {
             buffer->append(clientSocket->readAll());
-            int newlineIndex = buffer->indexOf('\n');
+            while (true) {
+                int newlineIndex = buffer->indexOf('\n');
 
-            if (newlineIndex == -1) {
-                return;
+                if (newlineIndex == -1) {
+                    break;
+                }
+
+                QByteArray line = buffer->left(newlineIndex);
+                buffer->remove(0, newlineIndex + 1);
+
+                QJsonParseError error;
+                QJsonDocument document = QJsonDocument::fromJson(line, &error);
+
+                if (error.error != QJsonParseError::NoError || !document.isObject()) {
+                    qDebug() << "Invalid JSON from client:" << QString::fromUtf8(line);
+                    continue;
+                }
+
+                QJsonObject json = document.object();
+
+                QString sender = json["sender"].toString();
+                QString receiver = json["receiver"].toString();
+                QString content = json["content"].toString();
+
+                qDebug() << "sender:" << sender;
+                qDebug() << "receiver:" << receiver;
+                qDebug() << "content:" << content;
             }
-
-            QByteArray line = buffer->left(newlineIndex);
-            buffer->remove(0, newlineIndex + 1);
-
-            QJsonParseError error;
-            QJsonDocument document = QJsonDocument::fromJson(line, &error);
-
-            if (error.error != QJsonParseError::NoError || !document.isObject()) {
-                qDebug() << "Invalid JSON from client:" << QString::fromUtf8(line);
-                return;
-            }
-
-            QJsonObject json = document.object();
-
-            QString sender = json["sender"].toString();
-            QString receiver = json["receiver"].toString();
-            QString content = json["content"].toString();
-
-            qDebug() << "sender:" << sender;
-            qDebug() << "receiver:" << receiver;
-            qDebug() << "content:" << content;
         });
     });
 
