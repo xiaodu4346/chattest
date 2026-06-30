@@ -93,6 +93,7 @@ void ChatWindow::handleSendMessage()
 
         QJsonDocument document(json);
         QByteArray data = document.toJson(QJsonDocument::Compact);
+        data.append('\n');
 
         socket->write(data);
     }

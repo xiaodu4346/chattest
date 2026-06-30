@@ -16,15 +16,24 @@ int main(int argc, char *argv[])
     QObject::connect(&server, &QTcpServer::newConnection, [&server](){
         QTcpSocket *clientSocket = server.nextPendingConnection();
         qDebug() << "New client connected:" << clientSocket;
+        QByteArray *buffer = new QByteArray();
 
-        QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket]() {
-            QByteArray data = clientSocket->readAll();
+        QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket,buffer]() {
+            buffer->append(clientSocket->readAll());
+            int newlineIndex = buffer->indexOf('\n');
+
+            if (newlineIndex == -1) {
+                return;
+            }
+
+            QByteArray line = buffer->left(newlineIndex);
+            buffer->remove(0, newlineIndex + 1);
 
             QJsonParseError error;
-            QJsonDocument document = QJsonDocument::fromJson(data, &error);
+            QJsonDocument document = QJsonDocument::fromJson(line, &error);
 
             if (error.error != QJsonParseError::NoError || !document.isObject()) {
-                qDebug() << "Invalid JSON from client:" << QString::fromUtf8(data);
+                qDebug() << "Invalid JSON from client:" << QString::fromUtf8(line);
                 return;
             }
 
