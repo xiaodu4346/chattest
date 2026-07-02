@@ -61,8 +61,18 @@ ChatWindow::ChatWindow(const QString &username, QWidget *parent)
     connect(friendList, &QListWidget::currentTextChanged, this, &ChatWindow::handleFriendChanged);
     friendList->setCurrentRow(0);
 
-    connect(socket, &QTcpSocket::connected, this, []() {
+    connect(socket, &QTcpSocket::connected, this, [this]() {
         qDebug() << "connected to server";
+
+        QJsonObject json;
+        json["type"] = "login";
+        json["username"] = this->username;
+
+        QJsonDocument document(json);
+        QByteArray data = document.toJson(QJsonDocument::Compact);
+        data.append('\n');
+
+        socket->write(data);
     });
 
     connect(socket, &QTcpSocket::errorOccurred, this, [](QAbstractSocket::SocketError) {

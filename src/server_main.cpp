@@ -40,7 +40,12 @@ int main(int argc, char *argv[])
                 QJsonObject json = document.object();
                 QString type = json["type"].toString();
 
-                if (type == "chat") {
+                if (type == "login") {
+                    QString username = json["username"].toString();
+
+                    qDebug() << "type:" << type;
+                    qDebug() << "user online:" << username;
+                } else if (type == "chat") {
                     QString sender = json["sender"].toString();
                     QString receiver = json["receiver"].toString();
                     QString content = json["content"].toString();
