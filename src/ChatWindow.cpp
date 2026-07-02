@@ -87,6 +87,7 @@ void ChatWindow::handleSendMessage()
     appendMessage(username, message);
     if (socket->state() == QTcpSocket::ConnectedState) {
         QJsonObject json;
+        json["type"] = "chat";
         json["sender"] = username;
         json["receiver"] = friendList->currentItem()->text();
         json["content"] = message;

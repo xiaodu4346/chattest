@@ -37,16 +37,21 @@ int main(int argc, char *argv[])
                     qDebug() << "Invalid JSON from client:" << QString::fromUtf8(line);
                     continue;
                 }
-
                 QJsonObject json = document.object();
+                QString type = json["type"].toString();
 
-                QString sender = json["sender"].toString();
-                QString receiver = json["receiver"].toString();
-                QString content = json["content"].toString();
+                if (type == "chat") {
+                    QString sender = json["sender"].toString();
+                    QString receiver = json["receiver"].toString();
+                    QString content = json["content"].toString();
 
-                qDebug() << "sender:" << sender;
-                qDebug() << "receiver:" << receiver;
-                qDebug() << "content:" << content;
+                    qDebug() << "type:" << type;
+                    qDebug() << "sender:" << sender;
+                    qDebug() << "receiver:" << receiver;
+                    qDebug() << "content:" << content;
+                } else {
+                    qDebug() << "Unknown message type:" << type;
+                }
             }
         });
 
