@@ -49,6 +49,12 @@ int main(int argc, char *argv[])
                 qDebug() << "content:" << content;
             }
         });
+
+        QObject::connect(clientSocket, &QTcpSocket::disconnected, [clientSocket, buffer]() {
+            qDebug() << "Client disconnected:" << clientSocket;
+            delete buffer;
+            clientSocket->deleteLater();
+        });
     });
 
     if (!server.listen(QHostAddress::Any,12345)) {
