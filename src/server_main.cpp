@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QMap>
 #include <QTcpServer>
 #include <QTcpSocket>
 
@@ -13,13 +14,17 @@ int main(int argc, char *argv[])
 
     QTcpServer server;
 
-    QObject::connect(&server, &QTcpServer::newConnection, [&server](){
+    QMap<QString,QTcpSocket*> onlineUsers;
+
+    QObject::connect(&server, &QTcpServer::newConnection, [&server, &onlineUsers](){
         QTcpSocket *clientSocket = server.nextPendingConnection();
         qDebug() << "New client connected:" << clientSocket;
         QByteArray *buffer = new QByteArray();
 
-        QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket,buffer]() {
+
+        QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket, buffer, &onlineUsers]() {
             buffer->append(clientSocket->readAll());
+
             while (true) {
                 int newlineIndex = buffer->indexOf('\n');
 
@@ -43,8 +48,11 @@ int main(int argc, char *argv[])
                 if (type == "login") {
                     QString username = json["username"].toString();
 
+                    onlineUsers[username] = clientSocket;
+
                     qDebug() << "type:" << type;
                     qDebug() << "user online:" << username;
+                    qDebug() << "online users count:" << onlineUsers.size(); 
                 } else if (type == "chat") {
                     QString sender = json["sender"].toString();
                     QString receiver = json["receiver"].toString();
@@ -60,8 +68,19 @@ int main(int argc, char *argv[])
             }
         });
 
-        QObject::connect(clientSocket, &QTcpSocket::disconnected, [clientSocket, buffer]() {
+        QObject::connect(clientSocket, &QTcpSocket::disconnected, [clientSocket, buffer, &onlineUsers]() {
             qDebug() << "Client disconnected:" << clientSocket;
+            for (auto it = onlineUsers.begin(); it != onlineUsers.end(); ) {
+                if (it.value() == clientSocket) {
+                    qDebug() << "user offline:" << it.key();
+                    it = onlineUsers.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+
+            qDebug() << "online users count:" << onlineUsers.size();
+            
             delete buffer;
             clientSocket->deleteLater();
         });
