@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QMap>
 #include <QString>
 #include <QWidget>
@@ -17,6 +18,7 @@ public:
     explicit ChatWindow(const QString &username, QWidget *parent = nullptr);
 
 private:
+    QByteArray receiveBuffer;
     QString username;
     QPlainTextEdit *messageView;
     QLineEdit *messageEdit;

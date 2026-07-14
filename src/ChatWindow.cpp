@@ -12,6 +12,7 @@
 #include <QPushButton>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QVBoxLayout>
 #include <QTcpSocket>
 
@@ -78,7 +79,40 @@ ChatWindow::ChatWindow(const QString &username, QWidget *parent)
     connect(socket, &QTcpSocket::errorOccurred, this, [](QAbstractSocket::SocketError) {
         qDebug() << "connect server error";
     });
-
+    connect(socket, &QTcpSocket::readyRead, this, [this]() {
+        receiveBuffer.append(socket->readAll());
+    
+        while (true) {
+            int newlineIndex = receiveBuffer.indexOf('\n');
+    
+            if (newlineIndex == -1) {
+                break;
+            }
+    
+            QByteArray line = receiveBuffer.left(newlineIndex);
+            receiveBuffer.remove(0, newlineIndex + 1);
+    
+            QJsonParseError error;
+            QJsonDocument document = QJsonDocument::fromJson(line, &error);
+    
+            if (error.error != QJsonParseError::NoError || !document.isObject()) {
+                qDebug() << "Invalid JSON from server:"
+                         << QString::fromUtf8(line);
+                continue;
+            }
+    
+            QJsonObject json = document.object();
+            QString type = json["type"].toString();
+    
+            if (type == "chat") {
+                QString sender = json["sender"].toString();
+                QString content = json["content"].toString();
+    
+                qDebug() << "received message from:" << sender;
+                qDebug() << "content:" << content;
+            }
+        }
+    });
     socket->connectToHost("127.0.0.1", 12345);
 }
 

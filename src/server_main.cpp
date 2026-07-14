@@ -62,6 +62,17 @@ int main(int argc, char *argv[])
                     qDebug() << "sender:" << sender;
                     qDebug() << "receiver:" << receiver;
                     qDebug() << "content:" << content;
+
+                    if (onlineUsers.contains(receiver)) {
+                        QTcpSocket *receiverSocket = onlineUsers.value(receiver);
+                    
+                        line.append('\n');
+                        receiverSocket->write(line);
+                    
+                        qDebug() << "message forwarded to:" << receiver;
+                    } else {
+                        qDebug() << "receiver offline:" << receiver;
+                    }
                 } else {
                     qDebug() << "Unknown message type:" << type;
                 }
