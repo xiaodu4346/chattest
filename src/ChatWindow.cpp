@@ -110,6 +110,7 @@ ChatWindow::ChatWindow(const QString &username, QWidget *parent)
     
                 qDebug() << "received message from:" << sender;
                 qDebug() << "content:" << content;
+                appendMessage(sender, sender, content);
             }
         }
     });
@@ -128,7 +129,9 @@ void ChatWindow::handleSendMessage()
         return;
     }
 
-    appendMessage(username, message);
+    const QString friendName = friendList->currentItem()->text();
+
+    appendMessage(friendName, username, message);
     if (socket->state() == QTcpSocket::ConnectedState) {
         QJsonObject json;
         json["type"] = "chat";
@@ -142,7 +145,6 @@ void ChatWindow::handleSendMessage()
 
         socket->write(data);
     }
-    appendAutoReply(message);
     messageEdit->clear();
 }
 
@@ -154,18 +156,15 @@ void ChatWindow::handleFriendChanged(const QString &friendName)
     messageView->setPlainText(chatHistory[friendName]);
 }
 
-void ChatWindow::appendMessage(const QString &sender, const QString &message)
+void ChatWindow::appendMessage(const QString &friendName, const QString &sender, const QString &message)
 {
-    const QString friendName = friendList->currentItem()->text();
     const QString chatLine = sender + ": " + message;
     DatabaseManager databaseManager;
     databaseManager.saveMessage(friendName, sender, message);
     chatHistory[friendName] += chatLine + "\n";
-    messageView->appendPlainText(chatLine);
-}
 
-void ChatWindow::appendAutoReply(const QString &message)
-{
-    const QString friendName = friendList->currentItem()->text();
-    appendMessage(friendName, "I received: " + message);
+    if (friendList->currentItem() != nullptr
+        && friendList->currentItem()->text() == friendName) {
+        messageView->appendPlainText(chatLine);
+    }
 }

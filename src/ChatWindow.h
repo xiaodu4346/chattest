@@ -30,6 +30,5 @@ private:
 
     void handleSendMessage();
     void handleFriendChanged(const QString &friendName);
-    void appendMessage(const QString &sender, const QString &message);
-    void appendAutoReply(const QString &message);
+    void appendMessage(const QString &friendName, const QString &sender, const QString &message);
 };
