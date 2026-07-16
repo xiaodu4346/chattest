@@ -1,7 +1,5 @@
 #include "ChatWindow.h"
 
-#include "DatabaseManager.h"
-
 #include <QAbstractSocket>
 #include <QDebug>
 #include <QHBoxLayout>
@@ -151,16 +149,12 @@ void ChatWindow::handleSendMessage()
 void ChatWindow::handleFriendChanged(const QString &friendName)
 {
     chatTargetLabel->setText("chatting with: " + friendName);
-    DatabaseManager databaseManager;
-    chatHistory[friendName] = databaseManager.loadMessages(friendName);
     messageView->setPlainText(chatHistory[friendName]);
 }
 
 void ChatWindow::appendMessage(const QString &friendName, const QString &sender, const QString &message)
 {
     const QString chatLine = sender + ": " + message;
-    DatabaseManager databaseManager;
-    databaseManager.saveMessage(friendName, sender, message);
     chatHistory[friendName] += chatLine + "\n";
 
     if (friendList->currentItem() != nullptr
