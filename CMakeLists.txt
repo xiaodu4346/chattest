@@ -19,6 +19,8 @@ qt_add_executable(ChatTest
 
 qt_add_executable(ChatServer
     src/server_main.cpp
+    src/ServerDatabase.h
+    src/ServerDatabase.cpp
 )
 
 target_link_libraries(ChatTest

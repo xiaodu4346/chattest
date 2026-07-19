@@ -14,6 +14,11 @@ Set-Location $projectRoot
 
 & $cmake --build build
 
+$sqlModuleSource = "C:\Qt\6.11.1\mingw_64\bin\Qt6Sql.dll"
+$sqlModuleTarget = Join-Path $projectRoot "build\Qt6Sql.dll"
+
+Copy-Item -Force $sqlModuleSource $sqlModuleTarget
+
 $sqlDriverSource = "C:\Qt\6.11.1\mingw_64\plugins\sqldrivers\qsqlite.dll"
 $sqlDriverTargetDir = Join-Path $projectRoot "build\sqldrivers"
 
