@@ -72,3 +72,28 @@ ServerDatabase::RegisterResult ServerDatabase::registerUser(const QString &usern
 
     return RegisterResult::Success;
 }
+
+ServerDatabase::LoginResult ServerDatabase::loginUser(const QString &username, const QString &password)
+{
+    QSqlQuery query;
+
+    query.prepare("SELECT password FROM users WHERE username = :username");
+    query.bindValue(":username", username);
+
+    if (!query.exec()) {
+        qDebug() << "Failed to query user:" << query.lastError().text();
+        return LoginResult::DatabaseError;
+    }
+
+    if (!query.next()) {
+        return LoginResult::UserNotFound;
+    }
+
+    const QString storedPassword = query.value("password").toString();
+
+    if (storedPassword != password) {
+        return LoginResult::WrongPassword;
+    }
+
+    return LoginResult::Success;
+}

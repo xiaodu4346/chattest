@@ -84,15 +84,32 @@ int main(int argc, char *argv[])
 
                     responseData.append('\n');
                     clientSocket->write(responseData);
-
                 } else if (type == "login") {
-                    QString username = json["username"].toString();
+                    const QString username = json["username"].toString();
+                    const QString password = json["password"].toString();
+                    const ServerDatabase::LoginResult result =
+                        database.loginUser(username, password);
+                        QJsonObject response;
+                    response["type"] = "login_result";
 
-                    onlineUsers[username] = clientSocket;
+                    if (result == ServerDatabase::LoginResult::Success) {
+                        onlineUsers[username] = clientSocket;
+                        response["result"] = "success";
 
-                    qDebug() << "type:" << type;
-                    qDebug() << "user online:" << username;
-                    qDebug() << "online users count:" << onlineUsers.size();
+                        qDebug() << "user online:" << username;
+                        qDebug() << "online users count:" << onlineUsers.size();
+                    } else if (result == ServerDatabase::LoginResult::UserNotFound) {
+                        response["result"] = "user_not_found";
+                    } else if (result == ServerDatabase::LoginResult::WrongPassword) {
+                        response["result"] = "wrong_password";
+                    } else {
+                        response["result"] = "database_error";
+                    }
+
+                    QByteArray responseData =
+                        QJsonDocument(response).toJson(QJsonDocument::Compact);
+                    responseData.append('\n');
+                    clientSocket->write(responseData);
                 } else if (type == "chat") {
                     QString sender = json["sender"].toString();
                     QString receiver = json["receiver"].toString();
