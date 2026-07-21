@@ -21,6 +21,11 @@ NetworkClient::NetworkClient(QObject *parent)
     connect(socket, &QTcpSocket::readyRead, this, &NetworkClient::handleReadyRead);
 }
 
+bool NetworkClient::isConnected() const
+{
+    return socket->state() == QAbstractSocket::ConnectedState;
+}
+
 void NetworkClient::connectToServer()
 {
     socket->connectToHost("127.0.0.1", 12345);

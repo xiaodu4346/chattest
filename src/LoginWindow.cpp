@@ -28,6 +28,7 @@ LoginWindow::LoginWindow(NetworkClient *networkClient, QWidget *parent)
 
     statusLabel = new QLabel(this);
     loginButton = new QPushButton("Login", this);
+    registerButton = new QPushButton("Register", this);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(titleLabel);
@@ -35,23 +36,29 @@ LoginWindow::LoginWindow(NetworkClient *networkClient, QWidget *parent)
     layout->addWidget(passwordEdit);
     layout->addWidget(statusLabel);
     layout->addWidget(loginButton);
+    layout->addWidget(registerButton);
 
     connect(loginButton, &QPushButton::clicked, this, &LoginWindow::handleLogin);
+    connect(registerButton, &QPushButton::clicked,
+            this, &LoginWindow::handleRegister);
+
     connect(networkClient, &NetworkClient::connected,
-        this, [this]() {
-            statusLabel->setText("Verifying account...");
-
-            QJsonObject json;
-            json["type"] = "login";
-            json["username"] = pendingUsername;
-            json["password"] = pendingPassword;
-
-            this->networkClient->sendJson(json);
-        });
+            this, &LoginWindow::sendPendingRequest);
 
     connect(networkClient, &NetworkClient::connectionError,
         this, [this](const QString &message) {
             statusLabel->setText("Connection error: " + message);
+        });
+
+    connect(networkClient, &NetworkClient::registerResult,
+        this, [this](const QString &result) {
+            if (result == "success") {
+                statusLabel->setText("Registration successful. You can now log in.");
+            } else if (result == "username_exists") {
+                statusLabel->setText("Username already exists");
+            } else {
+                statusLabel->setText("Server database error");
+            }
         });
 
     connect(networkClient, &NetworkClient::loginResult,
@@ -92,7 +99,60 @@ void LoginWindow::handleLogin()
 
     pendingUsername = username;
     pendingPassword = password;
+    pendingAction = PendingAction::Login;
 
-    statusLabel->setText("Connecting to server...");
-    networkClient->connectToServer();
+    if (networkClient->isConnected()) {
+        sendPendingRequest();
+    } else {
+        statusLabel->setText("Connecting to server...");
+        networkClient->connectToServer();
+    }
+}
+
+void LoginWindow::handleRegister()
+{
+    const QString username = usernameEdit->text();
+    const QString password = passwordEdit->text();
+
+    if (username.isEmpty()) {
+        statusLabel->setText("Please enter a username");
+        return;
+    }
+
+    if (password.isEmpty()) {
+        statusLabel->setText("Please enter a password");
+        return;
+    }
+
+    pendingUsername = username;
+    pendingPassword = password;
+    pendingAction = PendingAction::Register;
+
+    if (networkClient->isConnected()) {
+        sendPendingRequest();
+    } else {
+        statusLabel->setText("Connecting to server...");
+        networkClient->connectToServer();
+    }
+}
+
+void LoginWindow::sendPendingRequest()
+{
+    QJsonObject json;
+
+    if (pendingAction == PendingAction::Login) {
+        statusLabel->setText("Verifying account...");
+        json["type"] = "login";
+    } else if (pendingAction == PendingAction::Register) {
+        statusLabel->setText("Creating account...");
+        json["type"] = "register";
+    } else {
+        return;
+    }
+
+    json["username"] = pendingUsername;
+    json["password"] = pendingPassword;
+
+    networkClient->sendJson(json);
+    pendingAction = PendingAction::None;
 }

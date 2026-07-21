@@ -14,6 +14,7 @@ class NetworkClient : public QObject
 public:
     explicit NetworkClient(QObject *parent = nullptr);
 
+    bool isConnected() const;
     void connectToServer();
     void sendJson(const QJsonObject &json);
 
