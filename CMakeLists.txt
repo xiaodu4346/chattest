@@ -15,6 +15,8 @@ qt_add_executable(ChatTest
     src/ChatWindow.cpp
     src/LoginWindow.h
     src/LoginWindow.cpp
+    src/NetworkClient.h
+    src/NetworkClient.cpp
 )
 
 qt_add_executable(ChatServer
