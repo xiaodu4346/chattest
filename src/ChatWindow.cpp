@@ -1,23 +1,20 @@
 #include "ChatWindow.h"
+#include "NetworkClient.h"
 
-#include <QAbstractSocket>
-#include <QDebug>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonParseError>
 #include <QVBoxLayout>
-#include <QTcpSocket>
 
-ChatWindow::ChatWindow(const QString &username, QWidget *parent)
+ChatWindow::ChatWindow(const QString &username, NetworkClient *networkClient,
+                       QWidget *parent)
     : QWidget(parent),
       username(username),
-      socket(new QTcpSocket(this))
+      networkClient(networkClient)
 {
     resize(640, 480);
     setWindowTitle("ChatTest");
@@ -60,59 +57,10 @@ ChatWindow::ChatWindow(const QString &username, QWidget *parent)
     connect(friendList, &QListWidget::currentTextChanged, this, &ChatWindow::handleFriendChanged);
     friendList->setCurrentRow(0);
 
-    connect(socket, &QTcpSocket::connected, this, [this]() {
-        qDebug() << "connected to server";
-
-        QJsonObject json;
-        json["type"] = "login";
-        json["username"] = this->username;
-
-        QJsonDocument document(json);
-        QByteArray data = document.toJson(QJsonDocument::Compact);
-        data.append('\n');
-
-        socket->write(data);
-    });
-
-    connect(socket, &QTcpSocket::errorOccurred, this, [](QAbstractSocket::SocketError) {
-        qDebug() << "connect server error";
-    });
-    connect(socket, &QTcpSocket::readyRead, this, [this]() {
-        receiveBuffer.append(socket->readAll());
-    
-        while (true) {
-            int newlineIndex = receiveBuffer.indexOf('\n');
-    
-            if (newlineIndex == -1) {
-                break;
-            }
-    
-            QByteArray line = receiveBuffer.left(newlineIndex);
-            receiveBuffer.remove(0, newlineIndex + 1);
-    
-            QJsonParseError error;
-            QJsonDocument document = QJsonDocument::fromJson(line, &error);
-    
-            if (error.error != QJsonParseError::NoError || !document.isObject()) {
-                qDebug() << "Invalid JSON from server:"
-                         << QString::fromUtf8(line);
-                continue;
-            }
-    
-            QJsonObject json = document.object();
-            QString type = json["type"].toString();
-    
-            if (type == "chat") {
-                QString sender = json["sender"].toString();
-                QString content = json["content"].toString();
-    
-                qDebug() << "received message from:" << sender;
-                qDebug() << "content:" << content;
+    connect(networkClient, &NetworkClient::chatReceived,
+            this, [this](const QString &sender, const QString &content) {
                 appendMessage(sender, sender, content);
-            }
-        }
-    });
-    socket->connectToHost("127.0.0.1", 12345);
+            });
 }
 
 void ChatWindow::handleSendMessage()
@@ -130,19 +78,14 @@ void ChatWindow::handleSendMessage()
     const QString friendName = friendList->currentItem()->text();
 
     appendMessage(friendName, username, message);
-    if (socket->state() == QTcpSocket::ConnectedState) {
-        QJsonObject json;
-        json["type"] = "chat";
-        json["sender"] = username;
-        json["receiver"] = friendList->currentItem()->text();
-        json["content"] = message;
 
-        QJsonDocument document(json);
-        QByteArray data = document.toJson(QJsonDocument::Compact);
-        data.append('\n');
+    QJsonObject json;
+    json["type"] = "chat";
+    json["sender"] = username;
+    json["receiver"] = friendName;
+    json["content"] = message;
 
-        socket->write(data);
-    }
+    networkClient->sendJson(json);
     messageEdit->clear();
 }
 
