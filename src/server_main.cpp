@@ -28,15 +28,22 @@ int main(int argc, char *argv[])
 
     QTcpServer server;
 
-    QMap<QString,QTcpSocket*> onlineUsers;
+    QMap<QString, QTcpSocket *> onlineUsers;
+    QMap<QTcpSocket *, QString> authenticatedUsers;
 
-    QObject::connect(&server, &QTcpServer::newConnection, [&server, &onlineUsers, &database](){
+    QObject::connect(
+        &server,
+        &QTcpServer::newConnection,
+        [&server, &onlineUsers, &authenticatedUsers, &database]() {
         QTcpSocket *clientSocket = server.nextPendingConnection();
         qDebug() << "New client connected:" << clientSocket;
         QByteArray *buffer = new QByteArray();
 
 
-        QObject::connect(clientSocket, &QTcpSocket::readyRead, [clientSocket, buffer, &onlineUsers, &database]() {
+        QObject::connect(
+            clientSocket,
+            &QTcpSocket::readyRead,
+            [clientSocket, buffer, &onlineUsers, &authenticatedUsers, &database]() {
             buffer->append(clientSocket->readAll());
 
             while (true) {
@@ -75,6 +82,10 @@ int main(int argc, char *argv[])
                         result == ServerDatabase::RegisterResult::UsernameExists
                     ) {
                         response["result"] = "username_exists";
+                    } else if (
+                        result == ServerDatabase::RegisterResult::InvalidInput
+                    ) {
+                        response["result"] = "invalid_input";
                     } else {
                         response["result"] = "database_error";
                     }
@@ -89,11 +100,29 @@ int main(int argc, char *argv[])
                     const QString password = json["password"].toString();
                     const ServerDatabase::LoginResult result =
                         database.loginUser(username, password);
-                        QJsonObject response;
+                    QJsonObject response;
                     response["type"] = "login_result";
 
                     if (result == ServerDatabase::LoginResult::Success) {
+                        const QString previousUsername =
+                            authenticatedUsers.value(clientSocket);
+
+                        if (!previousUsername.isEmpty()
+                            && previousUsername != username
+                            && onlineUsers.value(previousUsername) == clientSocket) {
+                            onlineUsers.remove(previousUsername);
+                        }
+
+                        QTcpSocket *previousSocket =
+                            onlineUsers.value(username, nullptr);
+
+                        if (previousSocket != nullptr
+                            && previousSocket != clientSocket) {
+                            authenticatedUsers.remove(previousSocket);
+                        }
+
                         onlineUsers[username] = clientSocket;
+                        authenticatedUsers[clientSocket] = username;
                         response["result"] = "success";
 
                         qDebug() << "user online:" << username;
@@ -102,6 +131,8 @@ int main(int argc, char *argv[])
                         response["result"] = "user_not_found";
                     } else if (result == ServerDatabase::LoginResult::WrongPassword) {
                         response["result"] = "wrong_password";
+                    } else if (result == ServerDatabase::LoginResult::InvalidInput) {
+                        response["result"] = "invalid_input";
                     } else {
                         response["result"] = "database_error";
                     }
@@ -111,9 +142,18 @@ int main(int argc, char *argv[])
                     responseData.append('\n');
                     clientSocket->write(responseData);
                 } else if (type == "chat") {
-                    QString sender = json["sender"].toString();
-                    QString receiver = json["receiver"].toString();
-                    QString content = json["content"].toString();
+                    const auto authenticatedUser =
+                        authenticatedUsers.constFind(clientSocket);
+
+                    if (authenticatedUser == authenticatedUsers.cend()) {
+                        qDebug() << "Ignored chat from unauthenticated client:"
+                                 << clientSocket;
+                        continue;
+                    }
+
+                    const QString sender = authenticatedUser.value();
+                    const QString receiver = json["receiver"].toString();
+                    const QString content = json["content"].toString();
 
                     qDebug() << "type:" << type;
                     qDebug() << "sender:" << sender;
@@ -123,8 +163,17 @@ int main(int argc, char *argv[])
                     if (onlineUsers.contains(receiver)) {
                         QTcpSocket *receiverSocket = onlineUsers.value(receiver);
 
-                        line.append('\n');
-                        receiverSocket->write(line);
+                        QJsonObject forwardedMessage;
+                        forwardedMessage["type"] = "chat";
+                        forwardedMessage["sender"] = sender;
+                        forwardedMessage["receiver"] = receiver;
+                        forwardedMessage["content"] = content;
+
+                        QByteArray forwardedData =
+                            QJsonDocument(forwardedMessage)
+                                .toJson(QJsonDocument::Compact);
+                        forwardedData.append('\n');
+                        receiverSocket->write(forwardedData);
 
                         qDebug() << "message forwarded to:" << receiver;
                     } else {
@@ -136,15 +185,18 @@ int main(int argc, char *argv[])
             }
         });
 
-        QObject::connect(clientSocket, &QTcpSocket::disconnected, [clientSocket, buffer, &onlineUsers]() {
+        QObject::connect(
+            clientSocket,
+            &QTcpSocket::disconnected,
+            [clientSocket, buffer, &onlineUsers, &authenticatedUsers]() {
             qDebug() << "Client disconnected:" << clientSocket;
-            for (auto it = onlineUsers.begin(); it != onlineUsers.end(); ) {
-                if (it.value() == clientSocket) {
-                    qDebug() << "user offline:" << it.key();
-                    it = onlineUsers.erase(it);
-                } else {
-                    ++it;
-                }
+
+            const QString username = authenticatedUsers.take(clientSocket);
+
+            if (!username.isEmpty()
+                && onlineUsers.value(username) == clientSocket) {
+                onlineUsers.remove(username);
+                qDebug() << "user offline:" << username;
             }
 
             qDebug() << "online users count:" << onlineUsers.size();

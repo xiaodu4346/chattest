@@ -56,6 +56,8 @@ LoginWindow::LoginWindow(NetworkClient *networkClient, QWidget *parent)
                 statusLabel->setText("Registration successful. You can now log in.");
             } else if (result == "username_exists") {
                 statusLabel->setText("Username already exists");
+            } else if (result == "invalid_input") {
+                statusLabel->setText("Username and password must not be empty");
             } else {
                 statusLabel->setText("Server database error");
             }
@@ -76,6 +78,8 @@ LoginWindow::LoginWindow(NetworkClient *networkClient, QWidget *parent)
                 statusLabel->setText("User not found");
             } else if (result == "wrong_password") {
                 statusLabel->setText("Wrong password");
+            } else if (result == "invalid_input") {
+                statusLabel->setText("Username and password must not be empty");
             } else {
                 statusLabel->setText("Server database error");
             }

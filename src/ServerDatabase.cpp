@@ -1,5 +1,6 @@
 #include "ServerDatabase.h"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -8,7 +9,7 @@
 bool ServerDatabase::openDatabase()
 {
     QSqlDatabase database = QSqlDatabase::addDatabase("QSQLITE");
-    database.setDatabaseName("server.db");
+    database.setDatabaseName(QCoreApplication::applicationDirPath() + "/server.db");
 
 
     if (!database.open()) {
@@ -42,6 +43,10 @@ bool ServerDatabase::createTables()
 
 ServerDatabase::RegisterResult ServerDatabase::registerUser(const QString &username, const QString &password)
 {
+    if (username.trimmed().isEmpty() || password.isEmpty()) {
+        return RegisterResult::InvalidInput;
+    }
+
     QSqlQuery checkQuery;
 
     checkQuery.prepare("SELECT 1 FROM users WHERE username = :username LIMIT 1");
@@ -75,6 +80,10 @@ ServerDatabase::RegisterResult ServerDatabase::registerUser(const QString &usern
 
 ServerDatabase::LoginResult ServerDatabase::loginUser(const QString &username, const QString &password)
 {
+    if (username.trimmed().isEmpty() || password.isEmpty()) {
+        return LoginResult::InvalidInput;
+    }
+
     QSqlQuery query;
 
     query.prepare("SELECT password FROM users WHERE username = :username");

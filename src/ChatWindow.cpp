@@ -81,7 +81,6 @@ void ChatWindow::handleSendMessage()
 
     QJsonObject json;
     json["type"] = "chat";
-    json["sender"] = username;
     json["receiver"] = friendName;
     json["content"] = message;
 

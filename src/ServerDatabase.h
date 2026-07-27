@@ -8,6 +8,7 @@ public:
     enum class RegisterResult {
         Success,
         UsernameExists,
+        InvalidInput,
         DatabaseError
     };
 
@@ -15,6 +16,7 @@ public:
         Success,
         UserNotFound,
         WrongPassword,
+        InvalidInput,
         DatabaseError
     };
 
