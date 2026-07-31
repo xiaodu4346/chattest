@@ -11,8 +11,12 @@ qt_standard_project_setup()
 
 qt_add_executable(ChatTest
     src/main.cpp
+    src/AddFriendDialog.h
+    src/AddFriendDialog.cpp
     src/ChatWindow.h
     src/ChatWindow.cpp
+    src/FriendRequestsDialog.h
+    src/FriendRequestsDialog.cpp
     src/LoginWindow.h
     src/LoginWindow.cpp
     src/NetworkClient.h

@@ -72,6 +72,7 @@ LoginWindow::LoginWindow(NetworkClient *networkClient, QWidget *parent)
                     new ChatWindow(pendingUsername, this->networkClient);
                 chatWindow->setAttribute(Qt::WA_DeleteOnClose);
                 chatWindow->show();
+                chatWindow->initialize();
 
                 close();
             } else if (result == "user_not_found") {

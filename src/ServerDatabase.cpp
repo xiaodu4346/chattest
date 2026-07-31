@@ -64,6 +64,41 @@ bool ServerDatabase::createTables()
         return false;
     }
 
+    const QString createFriendRequestsTable = R"(
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            requester_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending'
+                CHECK(status IN ('pending', 'accepted', 'rejected')),
+            requester_notified INTEGER NOT NULL DEFAULT 0
+                CHECK(requester_notified IN (0, 1)),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            responded_at TEXT,
+            CHECK(requester_id <> receiver_id),
+            FOREIGN KEY(requester_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(receiver_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    )";
+
+    if (!query.exec(createFriendRequestsTable)) {
+        qDebug() << "Failed to create friend_requests table:"
+                 << query.lastError().text();
+        return false;
+    }
+
+    const QString createPendingRequestIndex = R"(
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_friend_requests_pending
+        ON friend_requests(requester_id, receiver_id)
+        WHERE status = 'pending'
+    )";
+
+    if (!query.exec(createPendingRequestIndex)) {
+        qDebug() << "Failed to create pending friend request index:"
+                 << query.lastError().text();
+        return false;
+    }
+
     return true;
 }
 
@@ -133,102 +168,376 @@ ServerDatabase::LoginResult ServerDatabase::loginUser(const QString &username, c
     return LoginResult::Success;
 }
 
-ServerDatabase::AddFriendResult ServerDatabase::addFriend(
+bool ServerDatabase::searchUsers(
     const QString &username,
-    const QString &friendUsername
+    const QString &keyword,
+    QStringList &usernames
 )
 {
-    if (username.trimmed().isEmpty()
-        || friendUsername.trimmed().isEmpty()) {
-        return AddFriendResult::InvalidInput;
+    usernames.clear();
+
+    const QString trimmedKeyword = keyword.trimmed();
+
+    if (username.trimmed().isEmpty() || trimmedKeyword.isEmpty()) {
+        return false;
     }
 
-    if (username == friendUsername) {
-        return AddFriendResult::CannotAddSelf;
-    }
-
-    QSqlQuery currentUserQuery;
-
-    currentUserQuery.prepare(
-        "SELECT id FROM users "
-        "WHERE username = :username "
-        "LIMIT 1"
+    QSqlQuery query;
+    query.prepare(
+        "SELECT candidate.username "
+        "FROM users AS candidate "
+        "JOIN users AS current_user "
+        "ON current_user.username = :username "
+        "WHERE candidate.id <> current_user.id "
+        "AND instr(lower(candidate.username), lower(:keyword)) > 0 "
+        "AND NOT EXISTS ("
+        "    SELECT 1 FROM friendships "
+        "    WHERE friendships.user1_id = "
+        "        CASE WHEN candidate.id < current_user.id "
+        "             THEN candidate.id ELSE current_user.id END "
+        "    AND friendships.user2_id = "
+        "        CASE WHEN candidate.id < current_user.id "
+        "             THEN current_user.id ELSE candidate.id END"
+        ") "
+        "ORDER BY candidate.username "
+        "LIMIT 50"
     );
-    currentUserQuery.bindValue(":username", username);
+    query.bindValue(":username", username);
+    query.bindValue(":keyword", trimmedKeyword);
 
-    if (!currentUserQuery.exec()) {
-        qDebug() << "Failed to query current user:"
-                 << currentUserQuery.lastError().text();
-        return AddFriendResult::DatabaseError;
+    if (!query.exec()) {
+        qDebug() << "Failed to search users:" << query.lastError().text();
+        return false;
     }
 
-    if (!currentUserQuery.next()) {
-        qDebug() << "Authenticated user not found:" << username;
-        return AddFriendResult::DatabaseError;
+    while (query.next()) {
+        usernames.append(query.value("username").toString());
     }
 
-    const int userId = currentUserQuery.value("id").toInt();
+    return true;
+}
 
-    QSqlQuery friendUserQuery;
+ServerDatabase::SendFriendRequestResult ServerDatabase::sendFriendRequest(
+    const QString &requesterUsername,
+    const QString &receiverUsername,
+    qint64 &requestId
+)
+{
+    requestId = 0;
 
-    friendUserQuery.prepare(
-        "SELECT id FROM users "
-        "WHERE username = :friendUsername "
-        "LIMIT 1"
+    if (requesterUsername.trimmed().isEmpty()
+        || receiverUsername.trimmed().isEmpty()) {
+        return SendFriendRequestResult::InvalidInput;
+    }
+
+    if (requesterUsername == receiverUsername) {
+        return SendFriendRequestResult::CannotAddSelf;
+    }
+
+    QSqlQuery requesterQuery;
+    requesterQuery.prepare(
+        "SELECT id FROM users WHERE username = :username LIMIT 1"
     );
-    friendUserQuery.bindValue(":friendUsername", friendUsername);
+    requesterQuery.bindValue(":username", requesterUsername);
 
-    if (!friendUserQuery.exec()) {
-        qDebug() << "Failed to query friend user:"
-                 << friendUserQuery.lastError().text();
-        return AddFriendResult::DatabaseError;
+    if (!requesterQuery.exec() || !requesterQuery.next()) {
+        qDebug() << "Failed to find authenticated requester:"
+                 << requesterQuery.lastError().text();
+        return SendFriendRequestResult::DatabaseError;
     }
 
-    if (!friendUserQuery.next()) {
-        return AddFriendResult::UserNotFound;
+    const qint64 requesterId = requesterQuery.value("id").toLongLong();
+
+    QSqlQuery receiverQuery;
+    receiverQuery.prepare(
+        "SELECT id FROM users WHERE username = :username LIMIT 1"
+    );
+    receiverQuery.bindValue(":username", receiverUsername);
+
+    if (!receiverQuery.exec()) {
+        qDebug() << "Failed to find friend request receiver:"
+                 << receiverQuery.lastError().text();
+        return SendFriendRequestResult::DatabaseError;
     }
 
-    const int friendId = friendUserQuery.value("id").toInt();
-    const int user1Id = userId < friendId ? userId : friendId;
-    const int user2Id = userId < friendId ? friendId : userId;
+    if (!receiverQuery.next()) {
+        return SendFriendRequestResult::UserNotFound;
+    }
+
+    const qint64 receiverId = receiverQuery.value("id").toLongLong();
+    const qint64 user1Id = qMin(requesterId, receiverId);
+    const qint64 user2Id = qMax(requesterId, receiverId);
 
     QSqlQuery friendshipQuery;
-
     friendshipQuery.prepare(
         "SELECT 1 FROM friendships "
-        "WHERE user1_id = :user1Id "
-        "AND user2_id = :user2Id "
-        "LIMIT 1"
+        "WHERE user1_id = :user1Id AND user2_id = :user2Id LIMIT 1"
     );
     friendshipQuery.bindValue(":user1Id", user1Id);
     friendshipQuery.bindValue(":user2Id", user2Id);
 
     if (!friendshipQuery.exec()) {
-        qDebug() << "Failed to check friendship:"
+        qDebug() << "Failed to check existing friendship:"
                  << friendshipQuery.lastError().text();
-        return AddFriendResult::DatabaseError;
+        return SendFriendRequestResult::DatabaseError;
     }
 
     if (friendshipQuery.next()) {
-        return AddFriendResult::AlreadyFriends;
+        return SendFriendRequestResult::AlreadyFriends;
     }
 
-    QSqlQuery insertFriendshipQuery;
-
-    insertFriendshipQuery.prepare(
-        "INSERT INTO friendships (user1_id, user2_id) "
-        "VALUES (:user1Id, :user2Id)"
+    QSqlQuery pendingQuery;
+    pendingQuery.prepare(
+        "SELECT 1 FROM friend_requests "
+        "WHERE status = 'pending' "
+        "AND ((requester_id = :requesterId AND receiver_id = :receiverId) "
+        "OR (requester_id = :receiverId AND receiver_id = :requesterId)) "
+        "LIMIT 1"
     );
-    insertFriendshipQuery.bindValue(":user1Id", user1Id);
-    insertFriendshipQuery.bindValue(":user2Id", user2Id);
+    pendingQuery.bindValue(":requesterId", requesterId);
+    pendingQuery.bindValue(":receiverId", receiverId);
 
-    if (!insertFriendshipQuery.exec()) {
-        qDebug() << "Failed to insert friendship:"
-                 << insertFriendshipQuery.lastError().text();
-        return AddFriendResult::DatabaseError;
+    if (!pendingQuery.exec()) {
+        qDebug() << "Failed to check pending friend request:"
+                 << pendingQuery.lastError().text();
+        return SendFriendRequestResult::DatabaseError;
     }
 
-    return AddFriendResult::Success;
+    if (pendingQuery.next()) {
+        return SendFriendRequestResult::RequestPending;
+    }
+
+    QSqlQuery insertQuery;
+    insertQuery.prepare(
+        "INSERT INTO friend_requests (requester_id, receiver_id) "
+        "VALUES (:requesterId, :receiverId)"
+    );
+    insertQuery.bindValue(":requesterId", requesterId);
+    insertQuery.bindValue(":receiverId", receiverId);
+
+    if (!insertQuery.exec()) {
+        qDebug() << "Failed to create friend request:"
+                 << insertQuery.lastError().text();
+        return SendFriendRequestResult::DatabaseError;
+    }
+
+    requestId = insertQuery.lastInsertId().toLongLong();
+    return SendFriendRequestResult::Success;
+}
+
+bool ServerDatabase::getPendingFriendRequests(
+    const QString &receiverUsername,
+    QList<FriendRequestInfo> &requests
+)
+{
+    requests.clear();
+
+    if (receiverUsername.trimmed().isEmpty()) {
+        return false;
+    }
+
+    QSqlQuery query;
+    query.prepare(
+        "SELECT friend_requests.id, requester.username "
+        "FROM friend_requests "
+        "JOIN users AS receiver "
+        "ON receiver.id = friend_requests.receiver_id "
+        "JOIN users AS requester "
+        "ON requester.id = friend_requests.requester_id "
+        "WHERE receiver.username = :receiverUsername "
+        "AND friend_requests.status = 'pending' "
+        "ORDER BY friend_requests.created_at, friend_requests.id"
+    );
+    query.bindValue(":receiverUsername", receiverUsername);
+
+    if (!query.exec()) {
+        qDebug() << "Failed to query pending friend requests:"
+                 << query.lastError().text();
+        return false;
+    }
+
+    while (query.next()) {
+        requests.append({
+            query.value("id").toLongLong(),
+            query.value("username").toString()
+        });
+    }
+
+    return true;
+}
+
+ServerDatabase::RespondFriendRequestResult
+ServerDatabase::respondToFriendRequest(
+    const QString &receiverUsername,
+    qint64 requestId,
+    bool accepted,
+    QString &requesterUsername
+)
+{
+    requesterUsername.clear();
+
+    if (receiverUsername.trimmed().isEmpty() || requestId <= 0) {
+        return RespondFriendRequestResult::RequestNotFound;
+    }
+
+    QSqlDatabase database = QSqlDatabase::database();
+
+    if (!database.transaction()) {
+        qDebug() << "Failed to start friend request transaction:"
+                 << database.lastError().text();
+        return RespondFriendRequestResult::DatabaseError;
+    }
+
+    QSqlQuery requestQuery(database);
+    requestQuery.prepare(
+        "SELECT friend_requests.status, friend_requests.requester_id, "
+        "friend_requests.receiver_id, requester.username "
+        "FROM friend_requests "
+        "JOIN users AS receiver "
+        "ON receiver.id = friend_requests.receiver_id "
+        "JOIN users AS requester "
+        "ON requester.id = friend_requests.requester_id "
+        "WHERE friend_requests.id = :requestId "
+        "AND receiver.username = :receiverUsername "
+        "LIMIT 1"
+    );
+    requestQuery.bindValue(":requestId", requestId);
+    requestQuery.bindValue(":receiverUsername", receiverUsername);
+
+    if (!requestQuery.exec()) {
+        qDebug() << "Failed to query friend request:"
+                 << requestQuery.lastError().text();
+        database.rollback();
+        return RespondFriendRequestResult::DatabaseError;
+    }
+
+    if (!requestQuery.next()) {
+        database.rollback();
+        return RespondFriendRequestResult::RequestNotFound;
+    }
+
+    if (requestQuery.value("status").toString() != "pending") {
+        database.rollback();
+        return RespondFriendRequestResult::AlreadyHandled;
+    }
+
+    const qint64 requesterId =
+        requestQuery.value("requester_id").toLongLong();
+    const qint64 receiverId =
+        requestQuery.value("receiver_id").toLongLong();
+    requesterUsername = requestQuery.value("username").toString();
+
+    if (accepted) {
+        const qint64 user1Id = qMin(requesterId, receiverId);
+        const qint64 user2Id = qMax(requesterId, receiverId);
+
+        QSqlQuery friendshipQuery(database);
+        friendshipQuery.prepare(
+            "INSERT OR IGNORE INTO friendships (user1_id, user2_id) "
+            "VALUES (:user1Id, :user2Id)"
+        );
+        friendshipQuery.bindValue(":user1Id", user1Id);
+        friendshipQuery.bindValue(":user2Id", user2Id);
+
+        if (!friendshipQuery.exec()) {
+            qDebug() << "Failed to create accepted friendship:"
+                     << friendshipQuery.lastError().text();
+            database.rollback();
+            return RespondFriendRequestResult::DatabaseError;
+        }
+    }
+
+    QSqlQuery updateQuery(database);
+    updateQuery.prepare(
+        "UPDATE friend_requests "
+        "SET status = :status, responded_at = CURRENT_TIMESTAMP, "
+        "requester_notified = 0 "
+        "WHERE id = :requestId AND status = 'pending'"
+    );
+    updateQuery.bindValue(":status", accepted ? "accepted" : "rejected");
+    updateQuery.bindValue(":requestId", requestId);
+
+    if (!updateQuery.exec() || updateQuery.numRowsAffected() != 1) {
+        qDebug() << "Failed to update friend request:"
+                 << updateQuery.lastError().text();
+        database.rollback();
+        return RespondFriendRequestResult::DatabaseError;
+    }
+
+    if (!database.commit()) {
+        qDebug() << "Failed to commit friend request response:"
+                 << database.lastError().text();
+        database.rollback();
+        return RespondFriendRequestResult::DatabaseError;
+    }
+
+    return RespondFriendRequestResult::Success;
+}
+
+bool ServerDatabase::getFriendRequestUpdates(
+    const QString &requesterUsername,
+    QList<FriendRequestUpdate> &updates
+)
+{
+    updates.clear();
+
+    if (requesterUsername.trimmed().isEmpty()) {
+        return false;
+    }
+
+    QSqlQuery query;
+    query.prepare(
+        "SELECT friend_requests.id, friend_requests.status, receiver.username "
+        "FROM friend_requests "
+        "JOIN users AS requester "
+        "ON requester.id = friend_requests.requester_id "
+        "JOIN users AS receiver "
+        "ON receiver.id = friend_requests.receiver_id "
+        "WHERE requester.username = :requesterUsername "
+        "AND friend_requests.status IN ('accepted', 'rejected') "
+        "AND friend_requests.requester_notified = 0 "
+        "ORDER BY friend_requests.responded_at, friend_requests.id"
+    );
+    query.bindValue(":requesterUsername", requesterUsername);
+
+    if (!query.exec()) {
+        qDebug() << "Failed to query friend request updates:"
+                 << query.lastError().text();
+        return false;
+    }
+
+    while (query.next()) {
+        updates.append({
+            query.value("id").toLongLong(),
+            query.value("username").toString(),
+            query.value("status").toString() == "accepted"
+        });
+    }
+
+    return true;
+}
+
+bool ServerDatabase::markFriendRequestUpdatesNotified(
+    const QList<qint64> &requestIds
+)
+{
+    QSqlQuery query;
+    query.prepare(
+        "UPDATE friend_requests SET requester_notified = 1 "
+        "WHERE id = :requestId"
+    );
+
+    for (qint64 requestId : requestIds) {
+        query.bindValue(":requestId", requestId);
+
+        if (!query.exec()) {
+            qDebug() << "Failed to mark friend request update as notified:"
+                     << query.lastError().text();
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool ServerDatabase::getFriends(
@@ -297,5 +606,43 @@ bool ServerDatabase::getFriends(
         );
     }
 
+    return true;
+}
+
+bool ServerDatabase::areFriends(
+    const QString &username,
+    const QString &friendUsername,
+    bool &friends
+)
+{
+    friends = false;
+
+    if (username.trimmed().isEmpty()
+        || friendUsername.trimmed().isEmpty()) {
+        return false;
+    }
+
+    QSqlQuery query;
+    query.prepare(
+        "SELECT 1 "
+        "FROM friendships "
+        "JOIN users AS first_user ON first_user.id = friendships.user1_id "
+        "JOIN users AS second_user ON second_user.id = friendships.user2_id "
+        "WHERE (first_user.username = :username "
+        "       AND second_user.username = :friendUsername) "
+        "OR (first_user.username = :friendUsername "
+        "    AND second_user.username = :username) "
+        "LIMIT 1"
+    );
+    query.bindValue(":username", username);
+    query.bindValue(":friendUsername", friendUsername);
+
+    if (!query.exec()) {
+        qDebug() << "Failed to check friendship for chat:"
+                 << query.lastError().text();
+        return false;
+    }
+
+    friends = query.next();
     return true;
 }
