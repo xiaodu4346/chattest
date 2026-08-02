@@ -94,4 +94,11 @@ public:
         const QString &friendUsername,
         bool &friends
     );
+
+    bool saveMessage(
+        const QString &senderUsername,
+        const QString &receiverUsername,
+        const QString &content,
+        qint64 &messageId
+    );
 };

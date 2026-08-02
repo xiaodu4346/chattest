@@ -99,6 +99,25 @@ bool ServerDatabase::createTables()
         return false;
     }
 
+    const QString createMessagesTable = R"(
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            content TEXT NOT NULL CHECK(length(content) > 0),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CHECK(sender_id <> receiver_id),
+            FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(receiver_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    )";
+
+    if (!query.exec(createMessagesTable)) {
+        qDebug() << "Failed to create messages table:"
+                 << query.lastError().text();
+        return false;
+    }
+
     return true;
 }
 
@@ -644,5 +663,83 @@ bool ServerDatabase::areFriends(
     }
 
     friends = query.next();
+    return true;
+}
+
+bool ServerDatabase::saveMessage(
+    const QString &senderUsername,
+    const QString &receiverUsername,
+    const QString &content,
+    qint64 &messageId
+)
+{
+    messageId = 0;
+
+    if (senderUsername.trimmed().isEmpty()
+        || receiverUsername.trimmed().isEmpty()
+        || content.isEmpty()
+        || senderUsername == receiverUsername) {
+        return false;
+    }
+
+    QSqlQuery userQuery;
+    userQuery.prepare(
+        "SELECT id, username FROM users "
+        "WHERE username IN (:senderUsername, :receiverUsername)"
+    );
+    userQuery.bindValue(":senderUsername", senderUsername);
+    userQuery.bindValue(":receiverUsername", receiverUsername);
+
+    if (!userQuery.exec()) {
+        qDebug() << "Failed to query message users:"
+                 << userQuery.lastError().text();
+        return false;
+    }
+
+    qint64 senderId = 0;
+    qint64 receiverId = 0;
+
+    while (userQuery.next()) {
+        const QString username = userQuery.value("username").toString();
+        const qint64 userId = userQuery.value("id").toLongLong();
+
+        if (username == senderUsername) {
+            senderId = userId;
+        } else if (username == receiverUsername) {
+            receiverId = userId;
+        }
+    }
+
+    if (senderId <= 0 || receiverId <= 0) {
+        qDebug() << "Sender or receiver not found while saving message:"
+                 << senderUsername << receiverUsername;
+        return false;
+    }
+
+    QSqlQuery insertQuery;
+    insertQuery.prepare(
+        "INSERT INTO messages (sender_id, receiver_id, content) "
+        "VALUES (:senderId, :receiverId, :content)"
+    );
+    insertQuery.bindValue(":senderId", senderId);
+    insertQuery.bindValue(":receiverId", receiverId);
+    insertQuery.bindValue(":content", content);
+
+    if (!insertQuery.exec()) {
+        qDebug() << "Failed to save message:"
+                 << insertQuery.lastError().text();
+        return false;
+    }
+
+    bool idIsValid = false;
+    const qint64 insertedMessageId =
+        insertQuery.lastInsertId().toLongLong(&idIsValid);
+
+    if (!idIsValid || insertedMessageId <= 0) {
+        qDebug() << "Failed to read inserted message ID";
+        return false;
+    }
+
+    messageId = insertedMessageId;
     return true;
 }

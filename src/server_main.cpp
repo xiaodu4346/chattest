@@ -459,7 +459,21 @@ int main(int argc, char *argv[])
                         continue;
                     }
 
+                    qint64 messageId = 0;
+
+                    if (!database.saveMessage(
+                            sender,
+                            receiver,
+                            content,
+                            messageId
+                        )) {
+                        qDebug() << "Failed to save chat message:"
+                                 << sender << receiver;
+                        continue;
+                    }
+
                     qDebug() << "type:" << type;
+                    qDebug() << "message id:" << messageId;
                     qDebug() << "sender:" << sender;
                     qDebug() << "receiver:" << receiver;
                     qDebug() << "content:" << content;
